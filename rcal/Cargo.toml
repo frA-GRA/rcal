@@ -56,7 +56,6 @@ required-features = ["zmq"]
 
 [[bin]]
 name = "asb_dump"
-required-features = ["zmq"]
 
 [[bin]]
 name = "asb_view"
