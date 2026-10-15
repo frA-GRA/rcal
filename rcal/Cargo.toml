@@ -21,6 +21,7 @@ zmq = ["dep:omq-tokio"]
 dds = ["dep:dust_dds"]
 compression = ["dep:flate2"]
 tui = ["dep:ratatui"]
+activemq = ["dep:tokio-stomp", "dep:futures"]
 default = ["service", "dds"]
 
 [dependencies]
@@ -41,6 +42,8 @@ uuid = { version = "1.24.0", features = ["v1", "v3", "v4", "slog", "serde", "rng
 omq-tokio = { version = "0.21.1", optional = true }
 dust_dds = { version = "0.16.0", optional = true }
 flate2 = { version = "1", optional = true }
+tokio-stomp = { version = "0.4.0", optional = true }
+futures = { version = "0.3", optional = true }
 tokio = { version = "1.53.1", features = ["full"] }
 quick-xml = { version = "0.37", features = ["serialize"] }
 chrono = { version = "0.4.45", features = ["serde"] }
@@ -93,6 +96,20 @@ required-features = ["zmq"]
 name = "zmq_qos"
 harness = true
 required-features = ["zmq"]
+
+[[test]]
+name = "activemq_asb_system"
+harness = true
+required-features = ["activemq"]
+
+[[test]]
+name = "activemq_qos"
+harness = true
+required-features = ["activemq"]
+
+[[example]]
+name = "activemq_pub_sub"
+required-features = ["activemq"]
 
 [dev-dependencies]
 serde_json = "1.0.151"

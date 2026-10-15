@@ -25,6 +25,9 @@ use crate::asb::zmq::{ZMQ_ASB_ID, ZmqAsb};
 #[cfg(feature = "dds")]
 use crate::asb::dds::{DDS_ASB_ID, DdsAsb};
 
+#[cfg(feature = "activemq")]
+use crate::asb::activemq::{AMQ_ASB_ID, ActivemqAsb};
+
 // ════════════════════════════════════════════════════════════════════════════
 // MessageHeaderDefaults
 // ════════════════════════════════════════════════════════════════════════════
@@ -348,6 +351,8 @@ enum CalBackend {
     Zmq(ZmqAsb),
     #[cfg(feature = "dds")]
     Dds(DdsAsb),
+    #[cfg(feature = "activemq")]
+    Activemq(ActivemqAsb),
 }
 
 /// Concrete CAL handle returned by [`get_cal`].
@@ -405,6 +410,15 @@ impl Cal {
                 d.get_oms_api_version().to_owned(),
                 d.connection_status().clone(),
             ),
+            #[cfg(feature = "activemq")]
+            CalBackend::Activemq(a) => (
+                a.oms_schema_version().to_owned(),
+                a.oms_schema_compiler_version().to_owned(),
+                a.get_system_label().map(str::to_owned),
+                a.get_asb_connection_version().to_owned(),
+                a.get_oms_api_version().to_owned(),
+                a.connection_status().clone(),
+            ),
         };
         Self {
             inner: Arc::new(Mutex::new(backend)),
@@ -437,6 +451,8 @@ impl Cal {
             CalBackend::Zmq(z) => z.message_header_defaults(),
             #[cfg(feature = "dds")]
             CalBackend::Dds(d) => d.message_header_defaults(),
+            #[cfg(feature = "activemq")]
+            CalBackend::Activemq(a) => a.message_header_defaults(),
         }
     }
 
@@ -477,6 +493,8 @@ impl Cal {
             CalBackend::Zmq(z) => z.create_writer::<M>(topic, qos),
             #[cfg(feature = "dds")]
             CalBackend::Dds(d) => d.create_writer::<M>(topic, qos),
+            #[cfg(feature = "activemq")]
+            CalBackend::Activemq(a) => a.create_writer::<M>(topic, qos),
         }
     }
 
@@ -491,6 +509,8 @@ impl Cal {
             CalBackend::Zmq(z) => z.create_reader::<M>(topic, qos),
             #[cfg(feature = "dds")]
             CalBackend::Dds(d) => d.create_reader::<M>(topic, qos),
+            #[cfg(feature = "activemq")]
+            CalBackend::Activemq(a) => a.create_reader::<M>(topic, qos),
         }
     }
 
@@ -501,6 +521,8 @@ impl Cal {
             CalBackend::Zmq(z) => z.close(),
             #[cfg(feature = "dds")]
             CalBackend::Dds(d) => d.close(),
+            #[cfg(feature = "activemq")]
+            CalBackend::Activemq(a) => a.close(),
         }
     }
 
@@ -511,6 +533,8 @@ impl Cal {
             CalBackend::Zmq(z) => z.connection_status().clone(),
             #[cfg(feature = "dds")]
             CalBackend::Dds(d) => d.connection_status().clone(),
+            #[cfg(feature = "activemq")]
+            CalBackend::Activemq(a) => a.connection_status().clone(),
         }
     }
 
@@ -524,6 +548,8 @@ impl Cal {
             CalBackend::Zmq(z) => z.register_status_listener(listener),
             #[cfg(feature = "dds")]
             CalBackend::Dds(d) => d.register_status_listener(listener),
+            #[cfg(feature = "activemq")]
+            CalBackend::Activemq(a) => a.register_status_listener(listener),
         }
     }
 
@@ -537,6 +563,8 @@ impl Cal {
             CalBackend::Zmq(z) => z.unregister_status_listener(listener),
             #[cfg(feature = "dds")]
             CalBackend::Dds(d) => d.unregister_status_listener(listener),
+            #[cfg(feature = "activemq")]
+            CalBackend::Activemq(a) => a.unregister_status_listener(listener),
         }
     }
 
@@ -547,6 +575,8 @@ impl Cal {
             CalBackend::Zmq(z) => z.get_system_uuid(),
             #[cfg(feature = "dds")]
             CalBackend::Dds(d) => d.get_system_uuid(),
+            #[cfg(feature = "activemq")]
+            CalBackend::Activemq(a) => a.get_system_uuid(),
         }
     }
 
@@ -557,6 +587,8 @@ impl Cal {
             CalBackend::Zmq(z) => z.get_service_uuid(),
             #[cfg(feature = "dds")]
             CalBackend::Dds(d) => d.get_service_uuid(),
+            #[cfg(feature = "activemq")]
+            CalBackend::Activemq(a) => a.get_service_uuid(),
         }
     }
 
@@ -567,6 +599,8 @@ impl Cal {
             CalBackend::Zmq(z) => z.get_subsystem_uuid(),
             #[cfg(feature = "dds")]
             CalBackend::Dds(d) => d.get_subsystem_uuid(),
+            #[cfg(feature = "activemq")]
+            CalBackend::Activemq(a) => a.get_subsystem_uuid(),
         }
     }
 
@@ -577,6 +611,8 @@ impl Cal {
             CalBackend::Zmq(z) => z.get_component_uuid(name),
             #[cfg(feature = "dds")]
             CalBackend::Dds(d) => d.get_component_uuid(name),
+            #[cfg(feature = "activemq")]
+            CalBackend::Activemq(a) => a.get_component_uuid(name),
         }
     }
 
@@ -587,6 +623,8 @@ impl Cal {
             CalBackend::Zmq(z) => z.get_capability_uuid(name),
             #[cfg(feature = "dds")]
             CalBackend::Dds(d) => d.get_capability_uuid(name),
+            #[cfg(feature = "activemq")]
+            CalBackend::Activemq(a) => a.get_capability_uuid(name),
         }
     }
 
@@ -597,6 +635,8 @@ impl Cal {
             CalBackend::Zmq(z) => z.get_system_label().map(str::to_owned),
             #[cfg(feature = "dds")]
             CalBackend::Dds(d) => d.get_system_label().map(str::to_owned),
+            #[cfg(feature = "activemq")]
+            CalBackend::Activemq(a) => a.get_system_label().map(str::to_owned),
         }
     }
 
@@ -612,6 +652,11 @@ impl Cal {
             CalBackend::Dds(_) => {
                 let _ = uri;
                 // DDS discovery is automatic; no explicit peer registration needed.
+            }
+            #[cfg(feature = "activemq")]
+            CalBackend::Activemq(_) => {
+                let _ = uri;
+                // ActiveMQ routing is handled by the broker; no explicit peer needed.
             }
         }
     }
@@ -644,6 +689,8 @@ impl AbstractServiceBus for Cal {
             CalBackend::Zmq(z) => z.get_system_uuid(),
             #[cfg(feature = "dds")]
             CalBackend::Dds(d) => d.get_system_uuid(),
+            #[cfg(feature = "activemq")]
+            CalBackend::Activemq(a) => a.get_system_uuid(),
         }
     }
     fn get_service_uuid(&self) -> Option<UUID> {
@@ -652,6 +699,8 @@ impl AbstractServiceBus for Cal {
             CalBackend::Zmq(z) => z.get_service_uuid(),
             #[cfg(feature = "dds")]
             CalBackend::Dds(d) => d.get_service_uuid(),
+            #[cfg(feature = "activemq")]
+            CalBackend::Activemq(a) => a.get_service_uuid(),
         }
     }
     fn get_subsystem_uuid(&self) -> Option<UUID> {
@@ -660,6 +709,8 @@ impl AbstractServiceBus for Cal {
             CalBackend::Zmq(z) => z.get_subsystem_uuid(),
             #[cfg(feature = "dds")]
             CalBackend::Dds(d) => d.get_subsystem_uuid(),
+            #[cfg(feature = "activemq")]
+            CalBackend::Activemq(a) => a.get_subsystem_uuid(),
         }
     }
     fn get_component_uuid(&self, name: &str) -> Option<UUID> {
@@ -668,6 +719,8 @@ impl AbstractServiceBus for Cal {
             CalBackend::Zmq(z) => z.get_component_uuid(name),
             #[cfg(feature = "dds")]
             CalBackend::Dds(d) => d.get_component_uuid(name),
+            #[cfg(feature = "activemq")]
+            CalBackend::Activemq(a) => a.get_component_uuid(name),
         }
     }
     fn get_capability_uuid(&self, name: &str) -> Option<UUID> {
@@ -676,6 +729,8 @@ impl AbstractServiceBus for Cal {
             CalBackend::Zmq(z) => z.get_capability_uuid(name),
             #[cfg(feature = "dds")]
             CalBackend::Dds(d) => d.get_capability_uuid(name),
+            #[cfg(feature = "activemq")]
+            CalBackend::Activemq(a) => a.get_capability_uuid(name),
         }
     }
     fn oms_schema_version(&self) -> &str {
@@ -703,6 +758,8 @@ impl AbstractServiceBus for Cal {
             CalBackend::Zmq(z) => z.register_status_listener(listener),
             #[cfg(feature = "dds")]
             CalBackend::Dds(d) => d.register_status_listener(listener),
+            #[cfg(feature = "activemq")]
+            CalBackend::Activemq(a) => a.register_status_listener(listener),
         }
     }
     fn unregister_status_listener(
@@ -714,6 +771,8 @@ impl AbstractServiceBus for Cal {
             CalBackend::Zmq(z) => z.unregister_status_listener(listener),
             #[cfg(feature = "dds")]
             CalBackend::Dds(d) => d.unregister_status_listener(listener),
+            #[cfg(feature = "activemq")]
+            CalBackend::Activemq(a) => a.unregister_status_listener(listener),
         }
     }
     fn close(&mut self) -> CalResult<()> {
@@ -722,6 +781,8 @@ impl AbstractServiceBus for Cal {
             CalBackend::Zmq(z) => z.close(),
             #[cfg(feature = "dds")]
             CalBackend::Dds(d) => d.close(),
+            #[cfg(feature = "activemq")]
+            CalBackend::Activemq(a) => a.close(),
         }
     }
 }
@@ -734,6 +795,8 @@ impl AbstractCal for Cal {
             CalBackend::Zmq(z) => z.message_header_defaults(),
             #[cfg(feature = "dds")]
             CalBackend::Dds(d) => d.message_header_defaults(),
+            #[cfg(feature = "activemq")]
+            CalBackend::Activemq(a) => a.message_header_defaults(),
         }
     }
     fn create_writer<M: CalMessage>(
@@ -746,6 +809,8 @@ impl AbstractCal for Cal {
             CalBackend::Zmq(z) => z.create_writer::<M>(topic, qos),
             #[cfg(feature = "dds")]
             CalBackend::Dds(d) => d.create_writer::<M>(topic, qos),
+            #[cfg(feature = "activemq")]
+            CalBackend::Activemq(a) => a.create_writer::<M>(topic, qos),
         }
     }
     fn create_reader<M: CalMessage>(
@@ -758,6 +823,8 @@ impl AbstractCal for Cal {
             CalBackend::Zmq(z) => z.create_reader::<M>(topic, qos),
             #[cfg(feature = "dds")]
             CalBackend::Dds(d) => d.create_reader::<M>(topic, qos),
+            #[cfg(feature = "activemq")]
+            CalBackend::Activemq(a) => a.create_reader::<M>(topic, qos),
         }
     }
 }
@@ -855,6 +922,17 @@ pub async fn get_cal(
         #[cfg(feature = "dds")]
         DDS_ASB_ID => CalBackend::Dds(
             DdsAsb::new(
+                key.service_identifier.clone(),
+                key.asb_identifier.clone(),
+                logger.clone(),
+                Arc::clone(&config),
+                transport,
+            )
+            .await?,
+        ),
+        #[cfg(feature = "activemq")]
+        AMQ_ASB_ID => CalBackend::Activemq(
+            ActivemqAsb::new(
                 key.service_identifier.clone(),
                 key.asb_identifier.clone(),
                 logger.clone(),
