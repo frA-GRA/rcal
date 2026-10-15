@@ -31,6 +31,9 @@ pub(crate) mod zmq;
 #[cfg(feature = "dds")]
 pub(crate) mod dds;
 
+#[cfg(feature = "activemq")]
+pub(crate) mod activemq;
+
 // ════════════════════════════════════════════════════════════════════════════
 // Config helpers
 // ════════════════════════════════════════════════════════════════════════════
