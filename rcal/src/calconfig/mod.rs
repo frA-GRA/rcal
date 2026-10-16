@@ -245,11 +245,7 @@ pub enum ExternalizerConfig {
     ///
     /// Requires the `exi` feature. Uses schema-less, byte-aligned EXI 1.0.
     #[cfg(feature = "exi")]
-    Exi {
-        /// Use indented, human-readable XML for the inner serializer (default: `false`).
-        #[serde(default)]
-        pretty: bool,
-    },
+    Exi,
     /// Byte-level compression chain wrapping an inner externalizer.
     ///
     /// Requires the `compression` feature.

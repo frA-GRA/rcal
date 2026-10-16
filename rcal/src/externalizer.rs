@@ -710,13 +710,11 @@ fn build_from_config(
         }
         ExternalizerConfig::Pretty => Ok(Box::new(PrettyExternalizer { next: None })),
         #[cfg(feature = "exi")]
-        ExternalizerConfig::Exi { pretty } => {
-            let format = if *pretty {
-                SerializationFormat::PrettyXml
-            } else {
-                SerializationFormat::Xml
-            };
-            let xml = Box::new(XmlExternalizer { format, next: None });
+        ExternalizerConfig::Exi => {
+            let xml = Box::new(XmlExternalizer {
+                format: SerializationFormat::Xml,
+                next: None,
+            });
             Ok(Box::new(ExiExternalizer::new(Some(xml))))
         }
         #[cfg(feature = "compression")]
