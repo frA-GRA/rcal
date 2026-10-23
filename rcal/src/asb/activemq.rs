@@ -443,54 +443,55 @@ impl AbstractCal for ActivemqAsb {
         let reader_logger = self.logger.new(slog::o!("topic" => cal_topic.to_string()));
         let broker_addr = self.broker_addr.clone();
 
-        // Connect eagerly before spawning. Inside tokio::spawn the STOMP CONNECT/CONNECTED
-        // handshake can hang indefinitely on Windows + Docker Desktop (second concurrent
-        // connection stalls). block_in_place parks this worker so the runtime stays live
-        // while the handshake completes; requires a multi-thread runtime (always the case
-        // for Cal in both tests and production).
+        let ack_mode = if reliable {
+            Some(AckMode::ClientIndividual)
+        } else {
+            None // broker uses auto-ack
+        };
+        let sub = Message {
+            content: ToServer::Subscribe {
+                destination: format!("/topic/{topic_str}"),
+                id: "sub-0".into(),
+                ack: ack_mode,
+            },
+            extra_headers: vec![],
+        };
+
+        // Connect and subscribe eagerly before spawning. Inside tokio::spawn the STOMP
+        // CONNECT/CONNECTED handshake can hang indefinitely on Windows + Docker Desktop
+        // (second concurrent connection stalls). block_in_place parks this worker so the
+        // runtime stays live while the handshake completes; requires a multi-thread runtime
+        // (always the case for Cal in both tests and production).
+        // Subscribing here (not in the task) guarantees the broker routes messages before
+        // create_reader returns, eliminating the need for a post-create sleep in tests.
         let host = broker_addr
             .split(':')
             .next()
             .unwrap_or(&broker_addr)
             .to_string();
         let transport = tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(client::connect(
-                &broker_addr,
-                &host,
-                None,
-                None,
-            ))
-        })
-        .map_err(|e| {
-            CalError::new(
-                CalErrorKind::InitializationFailure,
-                format!("ActiveMQ reader connect to '{broker_addr}' failed: {e}"),
-            )
+            tokio::runtime::Handle::current().block_on(async {
+                let mut t = client::connect(&broker_addr, &host, None, None)
+                    .await
+                    .map_err(|e| {
+                        CalError::new(
+                            CalErrorKind::InitializationFailure,
+                            format!("ActiveMQ reader connect to '{broker_addr}' failed: {e}"),
+                        )
+                    })?;
+                t.send(sub).await.map_err(|_| {
+                    CalError::new(
+                        CalErrorKind::InitializationFailure,
+                        format!("ActiveMQ reader subscribe on '{broker_addr}' failed"),
+                    )
+                })?;
+                Ok::<_, CalError>(t)
+            })
         })?;
 
         let task = tokio::spawn(async move {
             let _done_guard = DoneGuard(task_done_task);
             let mut transport = transport;
-
-            let ack_mode = if reliable {
-                Some(AckMode::ClientIndividual)
-            } else {
-                None // broker uses auto-ack
-            };
-            let sub = Message {
-                content: ToServer::Subscribe {
-                    destination: format!("/topic/{topic_str}"),
-                    id: "sub-0".into(),
-                    ack: ack_mode,
-                },
-                extra_headers: vec![],
-            };
-            if transport.send(sub).await.is_err() {
-                slog::error!(reader_logger, "ActiveMQ reader subscribe failed");
-                task_alive_task.store(false, Ordering::Release);
-                poll_state_task.1.notify_all();
-                return;
-            }
             let mut last_accepted: Option<Instant> = None;
 
             loop {
