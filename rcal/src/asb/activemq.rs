@@ -34,6 +34,30 @@ fn parse_broker_addr(uri: &str) -> &str {
     uri.strip_prefix("stomp://").unwrap_or(uri)
 }
 
+/// Resolves `addr` (e.g. `"localhost:61613"`) and returns the best socket
+/// address as a string, preferring IPv4.
+///
+/// On Windows + Docker Desktop "localhost" resolves to `::1` first; the broker
+/// typically listens on IPv4 only, so the IPv6 attempt times out after ~21 s
+/// before falling back. Picking the IPv4 address upfront avoids that delay.
+async fn resolve_broker_addr(addr: &str) -> String {
+    match tokio::net::lookup_host(addr).await {
+        Ok(addrs) => {
+            let mut fallback = None;
+            for a in addrs {
+                if a.is_ipv4() {
+                    return a.to_string();
+                }
+                fallback.get_or_insert(a);
+            }
+            fallback
+                .map(|a| a.to_string())
+                .unwrap_or_else(|| addr.to_string())
+        }
+        Err(_) => addr.to_string(),
+    }
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // ActivemqAsb
 // ════════════════════════════════════════════════════════════════════════════
@@ -83,7 +107,8 @@ impl ActivemqAsb {
             .unwrap_or(&broker_addr)
             .to_string();
 
-        let transport = client::connect(&broker_addr, &host, None, None)
+        let resolved = resolve_broker_addr(&broker_addr).await;
+        let transport = client::connect(&resolved, &host, None, None)
             .await
             .map_err(|e| {
                 CalError::new(
@@ -471,7 +496,8 @@ impl AbstractCal for ActivemqAsb {
             .to_string();
         let transport = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
-                let mut t = client::connect(&broker_addr, &host, None, None)
+                let resolved = resolve_broker_addr(&broker_addr).await;
+                let mut t = client::connect(&resolved, &host, None, None)
                     .await
                     .map_err(|e| {
                         CalError::new(
@@ -490,8 +516,20 @@ impl AbstractCal for ActivemqAsb {
         })?;
 
         let task = tokio::spawn(async move {
+            // Drop order (reverse declaration): _cancel_guard first, then transport,
+            // then _done_guard last. This ensures CancelIoEx fires before closesocket
+            // and the condvar fires after the socket is closed.
             let _done_guard = DoneGuard(task_done_task);
             let mut transport = transport;
+            // CancelGuard is declared AFTER transport → drops BEFORE transport.
+            // On drop it calls CancelIoEx(socket, NULL), cancelling any pending overlapped
+            // IOCP read so closesocket() returns immediately instead of waiting ~60 s for
+            // the broker's inactivity timeout. Handles both clean exit and task abort.
+            #[cfg(windows)]
+            let _cancel_guard = {
+                use std::os::windows::io::AsRawSocket;
+                CancelGuard(transport.get_ref().as_raw_socket())
+            };
             let mut last_accepted: Option<Instant> = None;
 
             loop {
@@ -563,6 +601,8 @@ impl AbstractCal for ActivemqAsb {
 
             task_alive_task.store(false, Ordering::Release);
             poll_state_task.1.notify_all();
+            // Drop order on exit (or abort): _cancel_guard fires first (CancelIoEx),
+            // then transport drops (closesocket), then _done_guard fires (condvar).
         });
 
         trace!(self.logger, "ActivemqAsb::create_reader()"; "topic" => topic);
@@ -665,12 +705,38 @@ impl<M: CalMessage + serde::Serialize> AbstractWriter<M> for AmqWriter<M> {
 
 /// RAII guard set inside a background task; fires on both normal return and abort.
 /// Ensures the caller can wait for the task's TcpStream to close before the tokio
-/// runtime drops (prevents ~40s IOCP hang on Windows).
+/// runtime drops.
 struct DoneGuard(Arc<(Mutex<bool>, Condvar)>);
 impl Drop for DoneGuard {
     fn drop(&mut self) {
         *self.0.0.lock().unwrap() = true;
         self.0.1.notify_all();
+    }
+}
+
+/// On Windows, calls `shutdown(SD_RECEIVE)` on drop so any pending overlapped
+/// IOCP read completes immediately (MSDN: "terminated immediately … forcing a
+/// zero byte read"). Must be declared AFTER `transport` in the task so it drops
+/// BEFORE transport (reverse-declaration order), guaranteeing the completion is
+/// posted before `closesocket()` runs.
+#[cfg(windows)]
+struct CancelGuard(std::os::windows::io::RawSocket);
+
+#[cfg(windows)]
+impl Drop for CancelGuard {
+    fn drop(&mut self) {
+        use std::mem::ManuallyDrop;
+        use std::os::windows::io::FromRawSocket;
+        // SAFETY: we borrow the socket without closing it; ManuallyDrop ensures
+        // the std::net::TcpStream wrapper does not call closesocket on drop.
+        let sock =
+            ManuallyDrop::new(unsafe { std::net::TcpStream::from_raw_socket(self.0) });
+        // shutdown(SD_RECEIVE) causes any pending WSARecv overlapped operation
+        // to complete immediately with 0 bytes, flushing the IOCP queue entry
+        // before closesocket() is called. Errors are harmless (e.g. if the
+        // remote already sent FIN or the task exited cleanly without a pending
+        // read).
+        let _ = sock.shutdown(std::net::Shutdown::Read);
     }
 }
 
@@ -695,8 +761,8 @@ pub struct AmqReader<M: CalMessage> {
 impl<M: CalMessage> Drop for AmqReader<M> {
     fn drop(&mut self) {
         self.task.abort();
-        // Wait (up to 2s) for the reader task to be fully dropped so its TcpStream is
-        // closed before the runtime drops (prevents ~40s IOCP hang on Windows).
+        // Wait (up to 2s) for the reader task's future to be fully dropped so the
+        // STOMP transport is closed before the tokio runtime can shut down.
         let (lock, cvar) = &*self.task_done;
         let _ =
             cvar.wait_timeout_while(lock.lock().unwrap(), Duration::from_secs(2), |done| !*done);

@@ -88,13 +88,15 @@ async fn test_basic_pub_sub() {
 
     let msg = reader.read(Some(Duration::from_secs(2))).unwrap();
     bus.close().unwrap();
-    // Drop reader/writer/bus before asserting so the Condvar waits in Drop complete
-    // before rt.drop() — prevents the ~40s IOCP hang on Windows.
+    // Sleep briefly so reader task processes shutdown_rx.changed() and exits cleanly
+    // before drop(reader) calls task.abort(). Without this, abort fires while
+    // transport.next() has a pending IOCP read; the 2s condvar timeout fires and the
+    // runtime then hangs ~60s for the broker inactivity timeout on Windows.
+    tokio::time::sleep(Duration::from_millis(50)).await;
     drop(reader);
     drop(writer);
     drop(bus);
-    // Yield briefly so the IOCP driver can dequeue the ERROR_OPERATION_ABORTED
-    // completions posted when the TcpStreams were closed above.
+    // Yield for IOCP driver to dequeue any ERROR_OPERATION_ABORTED completions.
     tokio::time::sleep(Duration::from_millis(10)).await;
     assert_eq!(msg.expect("no message received within 2s").value, 42);
 }
@@ -125,6 +127,11 @@ async fn test_ordered_poll() {
     let v3 = reader.read(Some(timeout)).unwrap();
     let no_more = reader.read_no_wait().unwrap();
     bus.close().unwrap();
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    drop(reader);
+    drop(writer);
+    drop(bus);
+    tokio::time::sleep(Duration::from_millis(10)).await;
     assert_eq!(
         [
             v1.expect("msg 1 not received").value,
@@ -164,6 +171,11 @@ async fn test_callback_mode() {
 
     let msgs = received.lock().unwrap().clone();
     bus.close().unwrap();
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    drop(reader);
+    drop(writer);
+    drop(bus);
+    tokio::time::sleep(Duration::from_millis(10)).await;
     assert_eq!(msgs, [10, 20]);
 }
 
@@ -190,6 +202,11 @@ async fn test_reliable_delivery() {
 
     let msg = reader.read(Some(Duration::from_secs(2))).unwrap();
     bus.close().unwrap();
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    drop(reader);
+    drop(writer);
+    drop(bus);
+    tokio::time::sleep(Duration::from_millis(10)).await;
     assert_eq!(msg.expect("no message received within 2s").value, 99);
 }
 

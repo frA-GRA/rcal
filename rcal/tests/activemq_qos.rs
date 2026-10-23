@@ -74,6 +74,8 @@ async fn test_time_based_filter() {
     let mut writer = bus.create_writer::<IntMsg>("tbf", wqos).unwrap();
     let mut reader = bus.create_reader::<IntMsg>("tbf", rqos).unwrap();
 
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
     // Send two rapid messages — second should be dropped by filter.
     writer.write(&IntMsg { value: 1 }).unwrap();
     writer.write(&IntMsg { value: 2 }).unwrap();
@@ -86,6 +88,11 @@ async fn test_time_based_filter() {
     );
 
     bus.close().unwrap();
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    drop(reader);
+    drop(writer);
+    drop(bus);
+    tokio::time::sleep(Duration::from_millis(10)).await;
 }
 
 /// Expiration drops messages older than max_age (CAL-005437).
@@ -116,6 +123,11 @@ async fn test_expiration() {
     );
 
     bus.close().unwrap();
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    drop(reader);
+    drop(writer);
+    drop(bus);
+    tokio::time::sleep(Duration::from_millis(10)).await;
 }
 
 /// Writer buffer drops oldest when full (CAL-005445).
@@ -155,10 +167,12 @@ async fn test_reader_buffer_drop_oldest() {
     let mut writer = bus.create_writer::<IntMsg>("rbuf", wqos).unwrap();
     let mut reader = bus.create_reader::<IntMsg>("rbuf", rqos).unwrap();
 
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
     for v in [10, 20, 30] {
         writer.write(&IntMsg { value: v }).unwrap();
     }
-    tokio::time::sleep(Duration::from_millis(50)).await;
+    tokio::time::sleep(Duration::from_millis(200)).await;
 
     // Only 2 slots; oldest (10) was dropped.
     let m1 = reader.read(Some(Duration::from_secs(2))).unwrap().unwrap();
@@ -167,4 +181,9 @@ async fn test_reader_buffer_drop_oldest() {
     assert!(reader.read_no_wait().unwrap().is_none());
 
     bus.close().unwrap();
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    drop(reader);
+    drop(writer);
+    drop(bus);
+    tokio::time::sleep(Duration::from_millis(10)).await;
 }
