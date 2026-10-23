@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use rcal::QName;
-use rcal::cal::{Cal, get_cal};
+use rcal::cal::{Cal, create_cal};
 use rcal::uci::CalMessage;
 use rcal::uci::base::{MessageListener, TopicQos};
 
@@ -39,7 +39,7 @@ fn make_config() -> std::sync::Arc<rcal::calconfig::CalConfig> {
 }
 
 async fn make_bus(service: &str, logger: slog::Logger) -> Cal {
-    get_cal(service, None::<&str>, make_config(), logger)
+    create_cal(service, None::<&str>, make_config(), logger)
         .await
         .unwrap()
 }
@@ -70,7 +70,7 @@ impl MessageListener<IntMsg> for CollectListener {
 
 /// Basic writer → reader round-trip via the broker.
 #[rcal_macros::init_test_logger]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_basic_pub_sub() {
     require_broker();
     let mut bus = make_bus("BasicPubSub", logger).await;
@@ -82,20 +82,26 @@ async fn test_basic_pub_sub() {
         .create_reader::<IntMsg>("data", TopicQos::default())
         .unwrap();
 
-    tokio::time::sleep(Duration::from_millis(200)).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     writer.write(&IntMsg { value: 42 }).unwrap();
-    tokio::time::sleep(Duration::from_millis(200)).await;
 
-    let msg = reader.read(Some(Duration::from_secs(2))).unwrap().unwrap();
-    assert_eq!(msg.value, 42);
-
+    let msg = reader.read(Some(Duration::from_secs(2))).unwrap();
     bus.close().unwrap();
+    // Drop reader/writer/bus before asserting so the Condvar waits in Drop complete
+    // before rt.drop() — prevents the ~40s IOCP hang on Windows.
+    drop(reader);
+    drop(writer);
+    drop(bus);
+    // Yield briefly so the IOCP driver can dequeue the ERROR_OPERATION_ABORTED
+    // completions posted when the TcpStreams were closed above.
+    tokio::time::sleep(Duration::from_millis(10)).await;
+    assert_eq!(msg.expect("no message received within 2s").value, 42);
 }
 
 /// Multiple messages, polling mode — order preserved.
 #[rcal_macros::init_test_logger]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_ordered_poll() {
     require_broker();
     let mut bus = make_bus("OrderedPoll", logger).await;
@@ -107,26 +113,32 @@ async fn test_ordered_poll() {
         .create_reader::<IntMsg>("ordered", TopicQos::default())
         .unwrap();
 
-    tokio::time::sleep(Duration::from_millis(200)).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     for v in [1, 2, 3] {
         writer.write(&IntMsg { value: v }).unwrap();
     }
-    tokio::time::sleep(Duration::from_millis(300)).await;
 
     let timeout = Duration::from_secs(2);
-    let v1 = reader.read(Some(timeout)).unwrap().unwrap().value;
-    let v2 = reader.read(Some(timeout)).unwrap().unwrap().value;
-    let v3 = reader.read(Some(timeout)).unwrap().unwrap().value;
-    assert_eq!([v1, v2, v3], [1, 2, 3]);
-    assert!(reader.read_no_wait().unwrap().is_none());
-
+    let v1 = reader.read(Some(timeout)).unwrap();
+    let v2 = reader.read(Some(timeout)).unwrap();
+    let v3 = reader.read(Some(timeout)).unwrap();
+    let no_more = reader.read_no_wait().unwrap();
     bus.close().unwrap();
+    assert_eq!(
+        [
+            v1.expect("msg 1 not received").value,
+            v2.expect("msg 2 not received").value,
+            v3.expect("msg 3 not received").value,
+        ],
+        [1, 2, 3]
+    );
+    assert!(no_more.is_none());
 }
 
 /// Callback mode — listener receives messages.
 #[rcal_macros::init_test_logger]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_callback_mode() {
     require_broker();
     let mut bus = make_bus("CallbackMode", logger).await;
@@ -144,20 +156,20 @@ async fn test_callback_mode() {
         }))
         .unwrap();
 
-    tokio::time::sleep(Duration::from_millis(200)).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     writer.write(&IntMsg { value: 10 }).unwrap();
     writer.write(&IntMsg { value: 20 }).unwrap();
-    tokio::time::sleep(Duration::from_millis(400)).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
-    assert_eq!(*received.lock().unwrap(), [10, 20]);
-
+    let msgs = received.lock().unwrap().clone();
     bus.close().unwrap();
+    assert_eq!(msgs, [10, 20]);
 }
 
 /// Reliable QoS — uses client-individual ACK (CAL-005434).
 #[rcal_macros::init_test_logger]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_reliable_delivery() {
     require_broker();
     use rcal::cal::{Reliability, TopicQos};
@@ -172,20 +184,18 @@ async fn test_reliable_delivery() {
         .unwrap();
     let mut reader = bus.create_reader::<IntMsg>("reliable", qos).unwrap();
 
-    tokio::time::sleep(Duration::from_millis(200)).await;
+    tokio::time::sleep(Duration::from_millis(500)).await;
 
     writer.write(&IntMsg { value: 99 }).unwrap();
-    tokio::time::sleep(Duration::from_millis(300)).await;
 
-    let msg = reader.read(Some(Duration::from_secs(2))).unwrap().unwrap();
-    assert_eq!(msg.value, 99);
-
+    let msg = reader.read(Some(Duration::from_secs(2))).unwrap();
     bus.close().unwrap();
+    assert_eq!(msg.expect("no message received within 2s").value, 99);
 }
 
 /// Status listener is called immediately on registration (CAL-016366).
 #[rcal_macros::init_test_logger]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_status_listener_immediate_call() {
     require_broker();
     use rcal::asb::{AsbStatus, AsbStatusListener};

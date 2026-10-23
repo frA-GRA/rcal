@@ -53,6 +53,8 @@ pub struct ActivemqAsb {
     service_name: String,
     /// Sender to the background write task. `None` after `close()`.
     write_tx: Option<tokio::sync::mpsc::UnboundedSender<(String, Vec<u8>)>>,
+    /// Signals when the writer task has fully exited and its TcpStream is closed.
+    writer_done: Arc<(Mutex<bool>, Condvar)>,
     status: AsbStatus,
     logger: Logger,
     config: Arc<CalConfig>,
@@ -94,7 +96,12 @@ impl ActivemqAsb {
         let shutdown_tx = Arc::new(shutdown_tx);
 
         let (write_tx, mut write_rx) = tokio::sync::mpsc::unbounded_channel::<(String, Vec<u8>)>();
+        let writer_done = Arc::new((Mutex::new(false), Condvar::new()));
+        let writer_done_task = Arc::clone(&writer_done);
         tokio::spawn(async move {
+            // Guard declared first → drops last, AFTER sink, ensuring the TcpStream
+            // is closed before Drop for ActivemqAsb unblocks (prevents IOCP hang).
+            let _writer_done_guard = DoneGuard(writer_done_task);
             let mut sink = transport;
             while let Some((topic, payload)) = write_rx.recv().await {
                 let msg = Message {
@@ -109,6 +116,7 @@ impl ActivemqAsb {
                     break;
                 }
             }
+            // sink drops here (before _writer_done_guard) → TcpStream closed → IOCP completion posted
         });
 
         let logger = logger.new(slog::o!("subsystem" => "activemq"));
@@ -116,6 +124,7 @@ impl ActivemqAsb {
             service_name: service_name.into(),
             asb_id: asb_id.into(),
             write_tx: Some(write_tx),
+            writer_done,
             status: AsbStatus::new(AsbConnectionState::Normal, "ActiveMQ ASB connected"),
             logger,
             config,
@@ -267,6 +276,20 @@ impl AbstractServiceBus for ActivemqAsb {
     }
 }
 
+impl Drop for ActivemqAsb {
+    fn drop(&mut self) {
+        // Ensure tasks stop even when close() was never called (e.g. panic unwind).
+        let _ = self.shutdown_tx.send(());
+        self.write_tx = None;
+        // Block until the writer task exits and closes its TcpStream. Without this,
+        // the tokio runtime drops before the IOCP read on the writer socket completes,
+        // causing a ~40s wait for ActiveMQ's inactivity timeout on Windows.
+        let (lock, cvar) = &*self.writer_done;
+        let _ =
+            cvar.wait_timeout_while(lock.lock().unwrap(), Duration::from_secs(2), |done| !*done);
+    }
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // AbstractCal implementation
 // ════════════════════════════════════════════════════════════════════════════
@@ -404,12 +427,14 @@ impl AbstractCal for ActivemqAsb {
 
         let poll_state: PollState<M> = Arc::new((Mutex::new(VecDeque::new()), Condvar::new()));
         let task_alive = Arc::new(AtomicBool::new(true));
+        let task_done = Arc::new((Mutex::new(false), Condvar::new()));
         let listeners: Arc<Mutex<Vec<Arc<dyn MessageListener<M>>>>> =
             Arc::new(Mutex::new(Vec::new()));
 
         let listeners_task = Arc::clone(&listeners);
         let poll_state_task = Arc::clone(&poll_state);
         let task_alive_task = Arc::clone(&task_alive);
+        let task_done_task = Arc::clone(&task_done);
         let topic_str = cal_topic.to_string();
         let externalizer: Arc<dyn Externalizer> =
             Arc::from(build_externalizer(&self.externalizer_name, &self.config)?);
@@ -418,21 +443,34 @@ impl AbstractCal for ActivemqAsb {
         let reader_logger = self.logger.new(slog::o!("topic" => cal_topic.to_string()));
         let broker_addr = self.broker_addr.clone();
 
+        // Connect eagerly before spawning. Inside tokio::spawn the STOMP CONNECT/CONNECTED
+        // handshake can hang indefinitely on Windows + Docker Desktop (second concurrent
+        // connection stalls). block_in_place parks this worker so the runtime stays live
+        // while the handshake completes; requires a multi-thread runtime (always the case
+        // for Cal in both tests and production).
+        let host = broker_addr
+            .split(':')
+            .next()
+            .unwrap_or(&broker_addr)
+            .to_string();
+        let transport = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(client::connect(
+                &broker_addr,
+                &host,
+                None,
+                None,
+            ))
+        })
+        .map_err(|e| {
+            CalError::new(
+                CalErrorKind::InitializationFailure,
+                format!("ActiveMQ reader connect to '{broker_addr}' failed: {e}"),
+            )
+        })?;
+
         let task = tokio::spawn(async move {
-            let host = broker_addr
-                .split(':')
-                .next()
-                .unwrap_or(&broker_addr)
-                .to_string();
-            let mut transport = match client::connect(&broker_addr, &host, None, None).await {
-                Ok(t) => t,
-                Err(e) => {
-                    slog::error!(reader_logger, "ActiveMQ reader connect failed"; "error" => %e);
-                    task_alive_task.store(false, Ordering::Release);
-                    poll_state_task.1.notify_all();
-                    return;
-                }
-            };
+            let _done_guard = DoneGuard(task_done_task);
+            let mut transport = transport;
 
             let ack_mode = if reliable {
                 Some(AckMode::ClientIndividual)
@@ -448,18 +486,19 @@ impl AbstractCal for ActivemqAsb {
                 extra_headers: vec![],
             };
             if transport.send(sub).await.is_err() {
+                slog::error!(reader_logger, "ActiveMQ reader subscribe failed");
                 task_alive_task.store(false, Ordering::Release);
                 poll_state_task.1.notify_all();
                 return;
             }
-
             let mut last_accepted: Option<Instant> = None;
 
             loop {
                 let frame = tokio::select! {
                     result = transport.next() => match result {
                         Some(Ok(r)) => r,
-                        _ => break,
+                        Some(Err(e)) => { slog::error!(reader_logger, "STOMP frame error"; "error" => %e); break; }
+                        None => break,
                     },
                     _ = shutdown_rx.changed() => break,
                 };
@@ -535,6 +574,7 @@ impl AbstractCal for ActivemqAsb {
             task_alive,
             expiration: expiration_dur,
             task,
+            task_done,
         }))
     }
 }
@@ -622,6 +662,17 @@ impl<M: CalMessage + serde::Serialize> AbstractWriter<M> for AmqWriter<M> {
 // AmqReader
 // ════════════════════════════════════════════════════════════════════════════
 
+/// RAII guard set inside a background task; fires on both normal return and abort.
+/// Ensures the caller can wait for the task's TcpStream to close before the tokio
+/// runtime drops (prevents ~40s IOCP hang on Windows).
+struct DoneGuard(Arc<(Mutex<bool>, Condvar)>);
+impl Drop for DoneGuard {
+    fn drop(&mut self) {
+        *self.0.0.lock().unwrap() = true;
+        self.0.1.notify_all();
+    }
+}
+
 /// ActiveMQ-backed [`AbstractReader`]: subscribes on a dedicated STOMP
 /// connection in a background task.
 ///
@@ -636,6 +687,19 @@ pub struct AmqReader<M: CalMessage> {
     task_alive: Arc<AtomicBool>,
     expiration: Option<Duration>,
     task: tokio::task::JoinHandle<()>,
+    /// Notified when the reader task's future is fully dropped (on exit or abort).
+    task_done: Arc<(Mutex<bool>, Condvar)>,
+}
+
+impl<M: CalMessage> Drop for AmqReader<M> {
+    fn drop(&mut self) {
+        self.task.abort();
+        // Wait (up to 2s) for the reader task to be fully dropped so its TcpStream is
+        // closed before the runtime drops (prevents ~40s IOCP hang on Windows).
+        let (lock, cvar) = &*self.task_done;
+        let _ =
+            cvar.wait_timeout_while(lock.lock().unwrap(), Duration::from_secs(2), |done| !*done);
+    }
 }
 
 #[rcal_macros::rcal_trace]
