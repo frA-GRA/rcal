@@ -1,5 +1,8 @@
 # Open Mission Systems Rust CAL Interface Generation Specification
 
+## IMPORTANT NOTE
+This document is AI generated from the rcal implementation (3.0.1 + some changes). Claude was a little overzealous and added a lot of implementation specific stuff and missed some general overview parts. This isn't meant to be a "final" requirements/spec doc but is a good start. It's useful for some usage information and an API overview. A later release will have a proper specification document.
+
 **Document:** rcal-SPC-RS (draft)
 **Baseline:** rcal 3.0.1, OMS CAL v2.5
 **Companion to:** OMSC-SPC-001 Rev L (CAL Specification) and OMSC-SPC-008 Rev K (C++ CAL Interface Generation Specification)
