@@ -129,6 +129,11 @@ harness = false
 name = "uuid"
 harness = false
 
+[[bench]]
+name = "compression"
+harness = false
+required-features = ["compression"]
+
 [workspace.metadata.release]
 allow-branch = [ "main" ]
 sign-commit = true
