@@ -47,7 +47,7 @@ impl CalMessage for BenchMsg {
 fn make_msg() -> BenchMsg {
     BenchMsg {
         id: "550e8400-e29b-41d4-a716-446655440000".into(),
-        value: 3.14159,
+        value: std::f64::consts::PI,
         label: "benchmark-message".into(),
         count: 42,
         active: true,
