@@ -48,8 +48,6 @@ An OMS Rust CAL API:
 |---|---|
 | OMSC-SPC-001 Rev L | Open Mission Systems CAL Specification |
 | OMSC-SPC-008 Rev K | Open Mission Systems C++ CAL Interface Generation Specification |
-| `specs/cal_cert_requirements.md` | Summary of `CERT CAL-` requirements |
-| `specs/cpp_cert_requirements.md` | Summary of `CERT CXX-` requirements |
 
 #### 1.2.2 Other Documents
 
