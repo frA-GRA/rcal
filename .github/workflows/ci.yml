@@ -53,7 +53,7 @@ jobs:
         ports:
           - 61613:61613
         options: >-
-          --health-cmd "nc -z localhost 61613"
+          --health-cmd "bash -c 'echo > /dev/tcp/localhost/61613'"
           --health-interval 5s
           --health-timeout 3s
           --health-retries 20
