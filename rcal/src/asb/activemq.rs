@@ -729,8 +729,7 @@ impl Drop for CancelGuard {
         use std::os::windows::io::FromRawSocket;
         // SAFETY: we borrow the socket without closing it; ManuallyDrop ensures
         // the std::net::TcpStream wrapper does not call closesocket on drop.
-        let sock =
-            ManuallyDrop::new(unsafe { std::net::TcpStream::from_raw_socket(self.0) });
+        let sock = ManuallyDrop::new(unsafe { std::net::TcpStream::from_raw_socket(self.0) });
         // shutdown(SD_RECEIVE) causes any pending WSARecv overlapped operation
         // to complete immediately with 0 bytes, flushing the IOCP queue entry
         // before closesocket() is called. Errors are harmless (e.g. if the
