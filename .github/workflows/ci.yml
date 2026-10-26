@@ -56,7 +56,8 @@ jobs:
           --health-cmd "nc -z localhost 61613"
           --health-interval 5s
           --health-timeout 3s
-          --health-retries 10
+          --health-retries 20
+          --health-start-period 30s
     steps:
       - uses: actions/checkout@v4
         with:
