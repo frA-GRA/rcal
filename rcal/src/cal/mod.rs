@@ -660,12 +660,6 @@ impl Cal {
             }
         }
     }
-
-    /// Returns `true` if both handles refer to the same underlying instance.
-    #[cfg(test)]
-    pub(crate) fn same_instance(&self, other: &Cal) -> bool {
-        Arc::ptr_eq(&self.inner, &other.inner)
-    }
 }
 
 // ════════════════════════════════════════════════════════════════════════════
