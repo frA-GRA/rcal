@@ -1,19 +1,34 @@
 use std::net::TcpStream;
 use std::process::Command;
+use std::sync::{Arc, Mutex, Weak};
 use std::time::{Duration, Instant};
 
 pub const BROKER_HOST: &str = "localhost";
 pub const BROKER_PORT: u16 = 61613;
 
+// Weak so the Arc refcount drives Drop; no strong ref kept after all tests release.
+static BROKER: Mutex<Weak<BrokerGuard>> = Mutex::new(Weak::new());
+
 /// RAII guard that ensures an ActiveMQ broker is running.
 /// If no broker is detected, starts one via docker or podman and stops it on drop.
+/// Shared via Arc so the container starts exactly once per test binary.
 pub struct BrokerGuard {
     runtime: Option<String>,
     container_id: Option<String>,
 }
 
 impl BrokerGuard {
-    pub fn require() -> Self {
+    pub fn require() -> Arc<Self> {
+        let mut lock = BROKER.lock().unwrap();
+        if let Some(arc) = lock.upgrade() {
+            return arc;
+        }
+        let arc = Arc::new(Self::start());
+        *lock = Arc::downgrade(&arc);
+        arc
+    }
+
+    fn start() -> Self {
         if TcpStream::connect((BROKER_HOST, BROKER_PORT)).is_ok() {
             return Self { runtime: None, container_id: None };
         }
