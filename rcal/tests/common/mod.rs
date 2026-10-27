@@ -30,17 +30,26 @@ impl BrokerGuard {
 
     fn start() -> Self {
         if TcpStream::connect((BROKER_HOST, BROKER_PORT)).is_ok() {
-            return Self { runtime: None, container_id: None };
+            return Self {
+                runtime: None,
+                container_id: None,
+            };
         }
 
         let runtime = find_runtime().expect(
             "ActiveMQ broker not reachable and neither docker nor podman found. \
              Start a broker (e.g. `docker run -p 61613:61613 apache/activemq-classic`) \
-             or install docker/podman before running these tests."
+             or install docker/podman before running these tests.",
         );
 
         let output = Command::new(&runtime)
-            .args(["run", "-d", "-p", &format!("{BROKER_PORT}:{BROKER_PORT}"), "apache/activemq-classic"])
+            .args([
+                "run",
+                "-d",
+                "-p",
+                &format!("{BROKER_PORT}:{BROKER_PORT}"),
+                "apache/activemq-classic",
+            ])
             .output()
             .unwrap_or_else(|e| panic!("Failed to start broker via {runtime}: {e}"));
 
@@ -55,7 +64,10 @@ impl BrokerGuard {
         wait_for_broker(BROKER_HOST, BROKER_PORT, Duration::from_secs(60))
             .unwrap_or_else(|| panic!("Broker container {container_id} started but port {BROKER_PORT} never became reachable"));
 
-        Self { runtime: Some(runtime), container_id: Some(container_id) }
+        Self {
+            runtime: Some(runtime),
+            container_id: Some(container_id),
+        }
     }
 }
 
@@ -70,7 +82,12 @@ impl Drop for BrokerGuard {
 
 fn find_runtime() -> Option<String> {
     for rt in ["docker", "podman"] {
-        if Command::new(rt).arg("--version").output().map(|o| o.status.success()).unwrap_or(false) {
+        if Command::new(rt)
+            .arg("--version")
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
+        {
             return Some(rt.to_string());
         }
     }
