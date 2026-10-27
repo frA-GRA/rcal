@@ -1,29 +1,20 @@
 //! System-level integration tests for the ActiveMQ ASB via `get_cal()`.
 //!
 //! Requires a running ActiveMQ Classic or Artemis broker on localhost:61613.
+//! If no broker is running, one is started automatically via docker or podman.
 //! Run with:
 //!   cargo test --features activemq --test activemq_asb_system
+
+mod common;
 
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+use common::{BROKER_HOST, BROKER_PORT};
 use rcal::QName;
 use rcal::cal::{Cal, create_cal};
 use rcal::uci::CalMessage;
 use rcal::uci::base::{MessageListener, TopicQos};
-
-const BROKER_HOST: &str = "localhost";
-const BROKER_PORT: u16 = 61613;
-
-fn require_broker() {
-    std::net::TcpStream::connect((BROKER_HOST, BROKER_PORT)).unwrap_or_else(|_| {
-        panic!(
-            "ActiveMQ broker not reachable at {BROKER_HOST}:{BROKER_PORT}. \
-             Start a broker (e.g. `docker run -p 61613:61613 apache/activemq-classic`) \
-             before running these tests."
-        )
-    });
-}
 
 fn make_config() -> std::sync::Arc<rcal::calconfig::CalConfig> {
     use rcal::calconfig;
@@ -72,7 +63,7 @@ impl MessageListener<IntMsg> for CollectListener {
 #[rcal_macros::init_test_logger]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_basic_pub_sub() {
-    require_broker();
+    let _broker = common::BrokerGuard::require();
     let mut bus = make_bus("BasicPubSub", logger).await;
 
     let mut writer = bus
@@ -105,7 +96,7 @@ async fn test_basic_pub_sub() {
 #[rcal_macros::init_test_logger]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_ordered_poll() {
-    require_broker();
+    let _broker = common::BrokerGuard::require();
     let mut bus = make_bus("OrderedPoll", logger).await;
 
     let mut writer = bus
@@ -147,7 +138,7 @@ async fn test_ordered_poll() {
 #[rcal_macros::init_test_logger]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_callback_mode() {
-    require_broker();
+    let _broker = common::BrokerGuard::require();
     let mut bus = make_bus("CallbackMode", logger).await;
 
     let mut writer = bus
@@ -183,7 +174,7 @@ async fn test_callback_mode() {
 #[rcal_macros::init_test_logger]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_reliable_delivery() {
-    require_broker();
+    let _broker = common::BrokerGuard::require();
     use rcal::cal::{Reliability, TopicQos};
     let mut bus = make_bus("ReliableTest", logger).await;
 
@@ -214,7 +205,7 @@ async fn test_reliable_delivery() {
 #[rcal_macros::init_test_logger]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_status_listener_immediate_call() {
-    require_broker();
+    let _broker = common::BrokerGuard::require();
     use rcal::asb::{AsbStatus, AsbStatusListener};
     use std::sync::atomic::{AtomicU32, Ordering};
 

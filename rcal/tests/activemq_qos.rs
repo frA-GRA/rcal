@@ -1,27 +1,18 @@
 //! QoS integration tests for the ActiveMQ ASB.
 //!
 //! Requires a running ActiveMQ Classic or Artemis broker on localhost:61613.
+//! If no broker is running, one is started automatically via docker or podman.
 //! Run with:
 //!   cargo test --features activemq --test activemq_qos
 
+mod common;
+
 use std::time::Duration;
 
+use common::{BROKER_HOST, BROKER_PORT};
 use rcal::QName;
 use rcal::cal::{Cal, Expiration, MessageBuffer, TimeBasedFilter, TopicQos, get_cal};
 use rcal::uci::CalMessage;
-
-const BROKER_HOST: &str = "localhost";
-const BROKER_PORT: u16 = 61613;
-
-fn require_broker() {
-    std::net::TcpStream::connect((BROKER_HOST, BROKER_PORT)).unwrap_or_else(|_| {
-        panic!(
-            "ActiveMQ broker not reachable at {BROKER_HOST}:{BROKER_PORT}. \
-             Start a broker (e.g. `docker run -p 61613:61613 apache/activemq-classic`) \
-             before running these tests."
-        )
-    });
-}
 
 fn make_config() -> std::sync::Arc<rcal::calconfig::CalConfig> {
     use rcal::calconfig;
@@ -60,7 +51,7 @@ impl CalMessage for IntMsg {
 #[rcal_macros::init_test_logger]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_time_based_filter() {
-    require_broker();
+    let _broker = common::BrokerGuard::require();
     let mut bus = make_bus("TbfTest", logger).await;
 
     let wqos = TopicQos::default();
@@ -99,7 +90,7 @@ async fn test_time_based_filter() {
 #[rcal_macros::init_test_logger]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_expiration() {
-    require_broker();
+    let _broker = common::BrokerGuard::require();
     let mut bus = make_bus("ExpiryTest", logger).await;
 
     let wqos = TopicQos::default();
@@ -134,7 +125,7 @@ async fn test_expiration() {
 #[rcal_macros::init_test_logger]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_writer_buffer_drop_oldest() {
-    require_broker();
+    let _broker = common::BrokerGuard::require();
     let mut bus = make_bus("WBufTest", logger).await;
 
     let wqos = TopicQos {
@@ -155,7 +146,7 @@ async fn test_writer_buffer_drop_oldest() {
 #[rcal_macros::init_test_logger]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_reader_buffer_drop_oldest() {
-    require_broker();
+    let _broker = common::BrokerGuard::require();
     let mut bus = make_bus("RBufTest", logger).await;
 
     let wqos = TopicQos::default();
