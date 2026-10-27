@@ -13,6 +13,7 @@
 //! ```
 //! Ctrl-C stops the bridge and releases all resources.
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use rcal::asb::get_asb_config_location;
@@ -25,6 +26,9 @@ use rcal::uci::{CalError, CalErrorKind, CalResult};
 struct BridgeConfig {
     service: String,
     transports: Vec<String>,
+    /// Optional per-transport peer URIs (ZMQ only).
+    /// TOML: `[bridge.peers]` with `TransportId = ["uri", ...]` entries.
+    peers: Option<HashMap<String, Vec<String>>>,
 }
 
 #[tokio::main]
@@ -68,6 +72,14 @@ async fn main() -> CalResult<()> {
         logger.clone(),
     )
     .await?;
+
+    if let Some(peers) = &bridge_cfg.peers {
+        for (transport_id, uris) in peers {
+            for uri in uris {
+                bridge.add_transport_peer(transport_id, uri.as_str());
+            }
+        }
+    }
 
     bridge.activate()?;
 

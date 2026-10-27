@@ -93,6 +93,7 @@ impl MessageListener<BridgeMsg> for TypedForwarder {
 /// forwarding. Call [`CalBridge::deactivate`] (or drop the value) to stop.
 pub struct CalBridge {
     cals: Vec<Cal>,
+    transport_ids: Vec<String>,
     config: Arc<CalConfig>,
     service_id: String,
     logger: Logger,
@@ -126,11 +127,24 @@ impl CalBridge {
         }
         Ok(Self {
             cals,
+            transport_ids: transport_ids.iter().map(|s| s.to_string()).collect(),
             config,
             service_id,
             logger,
             _keep_alive: Vec::new(),
         })
+    }
+
+    /// Registers a remote RADIO URI for the named transport (ZMQ only).
+    ///
+    /// Must be called before [`activate`]. Causes the bridge's reader DISH on
+    /// that transport to connect to the given URI instead of its own RADIO,
+    /// which is necessary for multi-process topologies and also prevents the
+    /// self-echo loop that arises in single-process use.
+    pub fn add_transport_peer(&mut self, transport_id: &str, uri: impl Into<String>) {
+        if let Some(idx) = self.transport_ids.iter().position(|id| id == transport_id) {
+            self.cals[idx].add_receive_peer(uri.into());
+        }
     }
 
     /// Begins forwarding messages between all connected CALs.
