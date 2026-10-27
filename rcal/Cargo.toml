@@ -24,6 +24,7 @@ tui = ["dep:ratatui"]
 activemq = ["dep:tokio-stomp", "dep:futures"]
 default = ["service", "dds"]
 exi = []
+bridge = ["service"]
 
 [dependencies]
 regex = "1"
@@ -57,6 +58,10 @@ glob = "0.3.4"
 [[bin]]
 name = "zmq_peer_sender"
 required-features = ["zmq"]
+
+[[bin]]
+name = "cal_bridge"
+required-features = ["bridge"]
 
 [[bin]]
 name = "asb_dump"
