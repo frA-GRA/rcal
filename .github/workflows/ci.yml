@@ -11,6 +11,8 @@ permissions:
 jobs:
   clippy:
     name: Run clippy on workspace
+    # Skip on release-plz PR merges; release.yml handles those pushes
+    if: ${{ !contains(github.event.head_commit.message, '/release-plz-') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -46,6 +48,8 @@ jobs:
           wait-for-processing: true
   test:
     name: Run all unit and integration tests
+    # Skip on release-plz PR merges; release.yml handles those pushes
+    if: ${{ !contains(github.event.head_commit.message, '/release-plz-') }}
     runs-on: ubuntu-latest
     services:
       activemq:
@@ -72,6 +76,8 @@ jobs:
           RCAL_XSD_PATH: examples/UCI_SystemStatusOnly_v2_5_0.xsd
   bench:
     name: Build and run benchmarks
+    # Skip on release-plz PR merges; release.yml handles those pushes
+    if: ${{ !contains(github.event.head_commit.message, '/release-plz-') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -87,6 +93,8 @@ jobs:
           RCAL_XSD_PATH: examples/UCI_SystemStatusOnly_v2_5_0.xsd
   examples:
     name: Build and run examples
+    # Skip on release-plz PR merges; release.yml handles those pushes
+    if: ${{ !contains(github.event.head_commit.message, '/release-plz-') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
