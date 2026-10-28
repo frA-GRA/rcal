@@ -444,6 +444,12 @@ impl Cal {
         &self.asb_identifier
     }
 
+    /// Returns `true` if `self` and `other` share the same underlying backend instance.
+    #[cfg(test)]
+    fn same_instance(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.inner, &other.inner)
+    }
+
     /// Returns the defaults used to pre-populate message headers.
     pub fn message_header_defaults(&self) -> MessageHeaderDefaults {
         match &*self.inner.lock().unwrap() {

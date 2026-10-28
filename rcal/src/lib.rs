@@ -5,6 +5,8 @@
 //! - OMSC-SPC-008 Rev K — C++ CAL Interface Generation Specification
 
 pub mod asb;
+#[cfg(feature = "bridge")]
+pub mod bridge;
 pub mod cal;
 pub mod calconfig;
 #[cfg(feature = "exi")]

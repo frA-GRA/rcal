@@ -24,6 +24,7 @@ tui = ["dep:ratatui"]
 activemq = ["dep:tokio-stomp", "dep:futures"]
 default = ["service", "dds"]
 exi = []
+bridge = ["service"]
 
 [dependencies]
 regex = "1"
@@ -59,6 +60,10 @@ name = "zmq_peer_sender"
 required-features = ["zmq"]
 
 [[bin]]
+name = "cal_bridge"
+required-features = ["bridge"]
+
+[[bin]]
 name = "asb_dump"
 
 [[bin]]
@@ -87,6 +92,11 @@ required-features = ["dds"]
 name = "zmq_radio_dish"
 harness = true
 required-features = ["zmq"]
+
+[[test]]
+name = "zmq_bridge_system"
+harness = true
+required-features = ["zmq", "bridge", "dds"]
 
 [[test]]
 name = "zmq_asb_system"
