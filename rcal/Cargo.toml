@@ -96,7 +96,7 @@ required-features = ["zmq"]
 [[test]]
 name = "zmq_bridge_system"
 harness = true
-required-features = ["zmq", "bridge"]
+required-features = ["zmq", "bridge", "dds"]
 
 [[test]]
 name = "zmq_asb_system"
