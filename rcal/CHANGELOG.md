@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [3.0.1] - 2026-10-28
+### Bug Fixes
+
+- Gate unused super::* import under cfg(feature = "zmq")([`8727992`](https://github.com/tclarke/rcal/commit/87279922490e3b5fad56e331f1bc4e8178c6f8de))
+- **example**: Switch system_status example to DDS transport([`ea5f194`](https://github.com/tclarke/rcal/commit/ea5f194261e7dc1dae9c4498033672afd137f155))
+- **exi**: Remove pretty option from Exi externalizer config([`51e5ef4`](https://github.com/tclarke/rcal/commit/51e5ef45d217ff0db1d06d886d492f7d611eca4b))
+- **activemq**: Connect reader transport eagerly to fix hung second connection on Windows([`1ce6119`](https://github.com/tclarke/rcal/commit/1ce611959cc92af574b128cd42b848ba598199b4))
+- **activemq**: Prefer IPv4 when resolving broker address([`174bea3`](https://github.com/tclarke/rcal/commit/174bea350a1cb5113c30d7dc995f580e23a25cd9))
+- **rcal**: Remove unused test function([`0e27a09`](https://github.com/tclarke/rcal/commit/0e27a09a08586edbbcdb0e26ba6859253ab74986))
+- **rcal**: Change hard-coded pi value to the rust constant([`e25a30c`](https://github.com/tclarke/rcal/commit/e25a30c12631df47fd714924cde88422260aa368))
+- **tests**: Start ActiveMQ container only once per test binary([`0244593`](https://github.com/tclarke/rcal/commit/0244593a42e21e5626ccfdcab28ad4fecf860006))
+- **cal_bridge**: Remove MessageTransformer. It's not used and design of the interface shouldn't be done yet.([`99bb578`](https://github.com/tclarke/rcal/commit/99bb57837dee0bd984418da2020126486cca750a))
+### Features
+
+- **asb**: Make DDS default transport, ZMQ optional ([#107](https://github.com/tclarke/rcal/pull/107))([`3c3f811`](https://github.com/tclarke/rcal/commit/3c3f811a1e0591b26b27148a56f504f79e298bce))
+- **adsb_sim**: Add Dockerfile and fix asb_dump feature gate([`e16f6f9`](https://github.com/tclarke/rcal/commit/e16f6f9f97552767402094223235e632617e7b23))
+- **asb**: Add ActiveMQ/STOMP AbstractServiceBus implementation ([#31](https://github.com/tclarke/rcal/pull/31))([`b81d5bb`](https://github.com/tclarke/rcal/commit/b81d5bb7201c2aecbfd66ed781d9e5d6d2769302))
+- **exi**: Add EXI externalizer with schema-less byte-aligned codec ([#110](https://github.com/tclarke/rcal/pull/110))([`4fa84ad`](https://github.com/tclarke/rcal/commit/4fa84ad700ddfe00d7be62e5964a162a1ea491e1))
+- **bench**: Add criterion benchmarks for EXI codec, serialization, and UUID([`36a9daa`](https://github.com/tclarke/rcal/commit/36a9daad87b71a3378fb754eeaee3dd65eb139a2))
+- **bench**: Add compression externalizer benchmarks([`6bff1e3`](https://github.com/tclarke/rcal/commit/6bff1e319f41dab5e885aab74eacedc0014903a7))
+- **tests**: Auto-start ActiveMQ broker via docker/podman([`0a55098`](https://github.com/tclarke/rcal/commit/0a55098575f491f4867ed0c5d5a777c8513ea3a0))
+### Refactoring
+
+- **dds**: Ponytail and caveman review cleanups([`a8388fb`](https://github.com/tclarke/rcal/commit/a8388fb2be81b5f72cadb5bac47e5507fe79d0ff))
+
+
 ## [3.0.0] - 2026-09-16
 ### Bug Fixes
 
