@@ -12,6 +12,8 @@ permissions:
 jobs:
   analyze:
     name: CodeQL
+    # Only on main pushes and release PRs; skip regular PRs
+    if: github.event_name != 'pull_request' || startsWith(github.head_ref, 'release-plz-')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

@@ -76,8 +76,8 @@ jobs:
           RCAL_XSD_PATH: examples/UCI_SystemStatusOnly_v2_5_0.xsd
   bench:
     name: Build and run benchmarks
-    # Skip on release-plz PR merges; release.yml handles those pushes
-    if: ${{ !contains(github.event.head_commit.message, '/release-plz-') }}
+    # Only on main pushes and release PRs; skip on regular PRs and release-plz merges
+    if: ${{ (github.event_name == 'push' || startsWith(github.head_ref, 'release-plz-')) && !contains(github.event.head_commit.message, '/release-plz-') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

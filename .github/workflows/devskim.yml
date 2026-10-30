@@ -16,8 +16,8 @@ on:
 jobs:
   lint:
     name: DevSkim
-    # Skip on release-plz PR merges; release.yml handles those pushes
-    if: ${{ !contains(github.event.head_commit.message, '/release-plz-') }}
+    # Only on main pushes/schedule and release PRs; skip regular PRs and release-plz merges
+    if: ${{ (github.event_name != 'pull_request' || startsWith(github.head_ref, 'release-plz-')) && !contains(github.event.head_commit.message, '/release-plz-') }}
     runs-on: ubuntu-latest
     permissions:
       actions: read
