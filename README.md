@@ -1,7 +1,7 @@
-[![CI](https://github.com/tclarke/rcal/actions/workflows/ci.yml/badge.svg)](https://github.com/tclarke/rcal/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/tclarke/rcal/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/tclarke/rcal/actions/workflows/github-code-scanning/codeql)
-[![DevSkim](https://github.com/tclarke/rcal/actions/workflows/devskim.yml/badge.svg)](https://github.com/tclarke/rcal/actions/workflows/devskim.yml)
-[![Release](https://github.com/tclarke/rcal/actions/workflows/release.yml/badge.svg)](https://github.com/tclarke/rcal/actions/workflows/release.yml)
+[![CI](https://github.com/frA-GRA/rcal/actions/workflows/ci.yml/badge.svg)](https://github.com/frA-GRA/rcal/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/frA-GRA/rcal/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/frA-GRA/rcal/actions/workflows/github-code-scanning/codeql)
+[![DevSkim](https://github.com/frA-GRA/rcal/actions/workflows/devskim.yml/badge.svg)](https://github.com/frA-GRA/rcal/actions/workflows/devskim.yml)
+[![Release](https://github.com/frA-GRA/rcal/actions/workflows/release.yml/badge.svg)](https://github.com/frA-GRA/rcal/actions/workflows/release.yml)
 
 ### `rcal` crate
 

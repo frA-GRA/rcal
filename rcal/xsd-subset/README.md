@@ -1,4 +1,4 @@
-[![CI](https://github.com/tclarke/rcal/actions/workflows/ci.yml/badge.svg)](https://github.com/tclarke/rcal/actions/workflows/ci.yml)
+[![CI](https://github.com/frA-GRA/rcal/actions/workflows/ci.yml/badge.svg)](https://github.com/frA-GRA/rcal/actions/workflows/ci.yml)
 
 # rcal-xsd-subset
 

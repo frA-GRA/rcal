@@ -926,116 +926,46 @@ fn generate_types(schema: &Schema, out_dir: &Path, subset: Option<&HashSet<Strin
 /// Parse a calconfig.toml and return the set of message type names referenced by topics.
 ///
 /// If `service_filter` is Some, only topics from those service IDs are included.
+///
+/// Handles both `topic = [{id="Foo"}, ...]` inline arrays and `[[service.topic]]` table arrays —
+/// the TOML parser normalises both to the same `Value::Array`.
 fn calconfig_topics(
     path: &str,
     service_filter: Option<&HashSet<String>>,
 ) -> Result<HashSet<String>, String> {
-    let content = fs::read_to_string(path).map_err(|e| format!("cannot read {path}: {e}"))?;
-    let mut topics: HashSet<String> = HashSet::new();
+    let raw = fs::read_to_string(path).map_err(|e| format!("cannot read {path}: {e}"))?;
+    // Normalise CRLF → LF so the toml parser handles Windows-created files.
+    let content = raw.replace('\r', "");
+    let doc: toml::Table = content
+        .parse()
+        .map_err(|e| format!("cannot parse {path}: {e}"))?;
 
-    #[derive(Default)]
-    enum Section {
-        #[default]
-        Other,
-        Service,
-        ServiceTopic,
-    }
+    let mut topics = HashSet::new();
+    let Some(services) = doc.get("service").and_then(|v| v.as_array()) else {
+        return Ok(topics);
+    };
 
-    let mut section = Section::default();
-    let mut current_service_id = String::new();
-    let mut current_topic_id = String::new();
-    let mut current_topic_type: Option<String> = None;
-    let mut in_selected_service = false;
-
-    let flush_topic =
-        |id: &str, type_: Option<&str>, in_svc: bool, topics: &mut HashSet<String>| {
-            if in_svc && !id.is_empty() {
-                topics.insert(type_.unwrap_or(id).to_owned());
-            }
+    for service in services {
+        let id = service.get("id").and_then(|v| v.as_str()).unwrap_or("");
+        let in_svc = service_filter
+            .map(|f| f.contains(id))
+            .unwrap_or(true);
+        if !in_svc {
+            continue;
+        }
+        let Some(topic_arr) = service.get("topic").and_then(|v| v.as_array()) else {
+            continue;
         };
-
-    for line in content.lines() {
-        let trimmed = line.trim();
-
-        if trimmed == "[[service]]" {
-            flush_topic(
-                &current_topic_id,
-                current_topic_type.as_deref(),
-                in_selected_service,
-                &mut topics,
-            );
-            current_topic_id.clear();
-            current_topic_type = None;
-            current_service_id.clear();
-            in_selected_service = false;
-            section = Section::Service;
-            continue;
-        }
-
-        if trimmed == "[[service.topic]]" {
-            flush_topic(
-                &current_topic_id,
-                current_topic_type.as_deref(),
-                in_selected_service,
-                &mut topics,
-            );
-            current_topic_id.clear();
-            current_topic_type = None;
-            section = Section::ServiceTopic;
-            continue;
-        }
-
-        // Any other array-of-tables header resets section
-        if trimmed.starts_with("[[") {
-            flush_topic(
-                &current_topic_id,
-                current_topic_type.as_deref(),
-                in_selected_service,
-                &mut topics,
-            );
-            current_topic_id.clear();
-            current_topic_type = None;
-            section = Section::Other;
-            continue;
-        }
-
-        match section {
-            Section::Service => {
-                if let Some(val) = parse_toml_string_value(trimmed, "id") {
-                    current_service_id = val;
-                    in_selected_service = service_filter
-                        .map(|f| f.contains(&current_service_id))
-                        .unwrap_or(true);
-                }
-            }
-            Section::ServiceTopic => {
-                if let Some(val) = parse_toml_string_value(trimmed, "id") {
-                    current_topic_id = val;
-                } else if let Some(val) = parse_toml_string_value(trimmed, "type") {
-                    current_topic_type = Some(val);
-                }
-            }
-            Section::Other => {}
+        for topic in topic_arr {
+            let Some(topic_id) = topic.get("id").or_else(|| topic.get("d")).and_then(|v| v.as_str()).filter(|s| !s.is_empty()) else {
+                continue;
+            };
+            let type_ = topic.get("type").and_then(|v| v.as_str()).unwrap_or(topic_id);
+            topics.insert(type_.to_owned());
         }
     }
-
-    flush_topic(
-        &current_topic_id,
-        current_topic_type.as_deref(),
-        in_selected_service,
-        &mut topics,
-    );
 
     Ok(topics)
-}
-
-/// Extract a `key = "value"` string from a TOML line.
-fn parse_toml_string_value(line: &str, key: &str) -> Option<String> {
-    let rest = line.strip_prefix(key)?.trim_start();
-    let rest = rest.strip_prefix('=')?.trim_start();
-    let rest = rest.strip_prefix('"')?;
-    let end = rest.find('"')?;
-    Some(rest[..end].to_owned())
 }
 
 /// Resolve all transitive XSD dependencies for the given message element names.
