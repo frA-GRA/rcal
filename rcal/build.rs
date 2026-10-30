@@ -87,6 +87,8 @@ fn main() {
         &mut std::collections::HashSet::new(),
     );
 
+    emit_schema_cfgs(&schema);
+
     if let Ok(schema_version) = std::env::var("RCAL_SCHEMA_VERSION") {
         println!("cargo::rustc-env=RCAL_SCHEMA_VERSION={schema_version}");
         eprintln!("Schema version={schema_version}");
@@ -623,6 +625,34 @@ fn attr(e: &quick_xml::events::BytesStart, key: &str) -> Option<String> {
 // Code generator
 // ════════════════════════════════════════════════════════════════════════════
 
+/// Emit cfg flags describing schema-dependent struct shapes used by hand-written
+/// extension code (e.g. `security_info_ext.rs`). Based on the fields present, not the
+/// schema version.
+fn emit_schema_cfgs(schema: &Schema) {
+    println!("cargo::rustc-check-cfg=cfg(uci_security_cui_basic)");
+    println!("cargo::rustc-check-cfg=cfg(uci_sci_controls_choice)");
+    let Some(sec) = schema
+        .complex_types
+        .iter()
+        .find(|ct| ct.name == "SecurityInformationType")
+    else {
+        return;
+    };
+    if sec.fields.iter().any(|f| f.name == "CUI_Basic") {
+        println!("cargo::rustc-cfg=uci_security_cui_basic");
+    }
+    if let Some(f) = sec.fields.iter().find(|f| f.name == "SCI_Controls") {
+        let (_, local) = schema.resolver.resolve_pair(&f.type_);
+        if schema
+            .complex_types
+            .iter()
+            .any(|ct| ct.name == local && ct.is_choice)
+        {
+            println!("cargo::rustc-cfg=uci_sci_controls_choice");
+        }
+    }
+}
+
 fn generate_types(schema: &Schema, out_dir: &Path, subset: Option<&HashSet<String>>) {
     let resolver = &schema.resolver;
     let mut mod_entries: Vec<String> = vec![];
@@ -947,9 +977,7 @@ fn calconfig_topics(
 
     for service in services {
         let id = service.get("id").and_then(|v| v.as_str()).unwrap_or("");
-        let in_svc = service_filter
-            .map(|f| f.contains(id))
-            .unwrap_or(true);
+        let in_svc = service_filter.map(|f| f.contains(id)).unwrap_or(true);
         if !in_svc {
             continue;
         }
@@ -957,10 +985,18 @@ fn calconfig_topics(
             continue;
         };
         for topic in topic_arr {
-            let Some(topic_id) = topic.get("id").or_else(|| topic.get("d")).and_then(|v| v.as_str()).filter(|s| !s.is_empty()) else {
+            let Some(topic_id) = topic
+                .get("id")
+                .or_else(|| topic.get("d"))
+                .and_then(|v| v.as_str())
+                .filter(|s| !s.is_empty())
+            else {
                 continue;
             };
-            let type_ = topic.get("type").and_then(|v| v.as_str()).unwrap_or(topic_id);
+            let type_ = topic
+                .get("type")
+                .and_then(|v| v.as_str())
+                .unwrap_or(topic_id);
             topics.insert(type_.to_owned());
         }
     }
