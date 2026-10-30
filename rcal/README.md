@@ -1,6 +1,6 @@
-[![CI](https://github.com/tclarke/rcal/actions/workflows/ci.yml/badge.svg)](https://github.com/tclarke/rcal/actions/workflows/ci.yml)
-[![CodeQL](https://github.com/tclarke/rcal/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/tclarke/rcal/actions/workflows/github-code-scanning/codeql)
-[![DevSkim](https://github.com/tclarke/rcal/actions/workflows/devskim.yml/badge.svg)](https://github.com/tclarke/rcal/actions/workflows/devskim.yml)
+[![CI](https://github.com/frA-GRA/rcal/actions/workflows/ci.yml/badge.svg)](https://github.com/frA-GRA/rcal/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/frA-GRA/rcal/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/frA-GRA/rcal/actions/workflows/github-code-scanning/codeql)
+[![DevSkim](https://github.com/frA-GRA/rcal/actions/workflows/devskim.yml/badge.svg)](https://github.com/frA-GRA/rcal/actions/workflows/devskim.yml)
 
 [![Crates.io Version](https://img.shields.io/crates/v/rcal)](https://crates.io/crates/rcal)
 [![docs.rs](https://img.shields.io/docsrs/rcal)](https://docs.rs/rcal)
@@ -21,7 +21,7 @@ Add to `Cargo.toml`:
 
 ```toml
 [dependencies]
-rcal = "2"
+rcal = "3"
 ```
 
 See the [`examples/`](examples/) directory for usage patterns.

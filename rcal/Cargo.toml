@@ -5,7 +5,7 @@ members = ["rcal_macros", "xsd-subset", "examples/simple_two_service"]
 version = "3.0.1"
 edition = "2024"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/tclarke/rcal"
+repository = "https://github.com/frA-GRA/rcal"
 
 [package]
 name = "rcal"

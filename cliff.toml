@@ -20,7 +20,7 @@ body = """
 {% for commit in commits %}\
 - {% if commit.scope %}**{{ commit.scope }}**: {% endif %}\
 {{ commit.message | upper_first }}\
- ([`{{ commit.id | truncate(length=7, end="") }}`](https://github.com/tclarke/rcal/commit/{{ commit.id }}))\
+ ([`{{ commit.id | truncate(length=7, end="") }}`](https://github.com/frA-GRA/rcal/commit/{{ commit.id }}))\
 {% if commit.breaking %} **BREAKING CHANGE**{% endif %}
 {% endfor %}\
 {% endfor %}\
