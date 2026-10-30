@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [3.0.2] - 2026-10-30
+### Bug Fixes
+
+- **build**: Replace hand-rolled TOML parser with toml crate([`a426142`](https://github.com/frA-GRA/rcal/commit/a426142261dfbfc2889768e98032b064c5234d94))
+
+
 ## [3.0.1] - 2026-10-28
 ### Bug Fixes
 
