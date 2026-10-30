@@ -16,14 +16,16 @@ level = "debug"
 
 [[transport]]
 id = "asb"
-type = "zmq"
-uri = "tcp://127.0.0.1:2200"
-peers = ["tcp://127.0.0.1:2201"]
+type = "dds"
 
 [[service]]
 id = "asb_view"
 topic = [
   {id="Entity"},
+  {id="PositionReport"},
+  {id="NavigationReport"},
+  {id="FlightCapabilityStatue"},
+  {id="FlightActivity"},
   {id="SystemStatus"},
   {id="ServiceStatus"},
   {id="ServiceStatusDataRequest"},

@@ -54,6 +54,7 @@ serde_json = "1"
 [build-dependencies]
 quick-xml = { version = "0.37" }
 glob = "0.3.4"
+toml = "1"
 
 [[bin]]
 name = "zmq_peer_sender"
